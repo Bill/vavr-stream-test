@@ -1,3 +1,4 @@
+import io.vavr.control.Option;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -88,6 +89,81 @@ public class StreamTest {
 
     private static int process(final Traversable<Integer> traversable, final int size) {
         return traversable.drop(size).head();
+    }
+
+
+    @Test
+    public void compareIteratorsRecursivelyTest() {
+        assertThat(compareRecursively( naturalsIterator().take(4),         naturalsIterator().take(4) ), is(0));
+        assertThat(compareRecursively( naturalsIterator().take(4),         naturalsIterator().take(3) ), is(1));
+        assertThat(compareRecursively( naturalsIterator().drop(1).take(4), naturalsIterator().take(4) ), is(1));
+        assertThat(compareRecursively( naturalsIterator().take(3),         naturalsIterator().take(4) ), is(-1));
+        assertThat(compareRecursively( naturalsIterator().take(4),         naturalsIterator().drop(1).take(4) ), is(-1));
+    }
+
+    /*
+     Stack-consuming comparison of two vavr "sequences" (Traversables)
+     */
+    public <T extends Comparable<T>> int compareRecursively(final Traversable<T> at, final Traversable<T> bt) {
+        final Option<T> ao = at.headOption();
+        final Option<T> bo = bt.headOption();
+        return ao.map( a ->
+                bo.map( b -> {
+                    final int comparison = a.compareTo(b);
+                    // not compareRecursively(at.tail(),bt.tail()) because at, bt were advanced (mutated)!
+                    return comparison == 0 ? compareRecursively(at,bt) : comparison;
+                }).getOrElse(1) // at is longer
+        ).getOrElse(()->bo.map( b -> -1) // bt is longer
+                .getOrElse(0)); // at, bt are equal
+    }
+
+    @Test
+    public void compareIteratorsLoopilyTest() {
+        assertThat(compareLoopily( naturalsIterator().take(4),         naturalsIterator().take(4) ), is(0));
+        assertThat(compareLoopily( naturalsIterator().take(4),         naturalsIterator().take(3) ), is(1));
+        assertThat(compareLoopily( naturalsIterator().drop(1).take(4), naturalsIterator().take(4) ), is(1));
+        assertThat(compareLoopily( naturalsIterator().take(3),         naturalsIterator().take(4) ), is(-1));
+        assertThat(compareLoopily( naturalsIterator().take(4),         naturalsIterator().drop(1).take(4) ), is(-1));
+    }
+
+    @Test
+    public void compareIteratorsLoopilyScalingTest() {
+        assertThat(compareLoopily( naturalsIterator().take(SIZE),      naturalsIterator().take(SIZE) ), is(0));
+        assertThat(compareLoopily( naturalsIterator().take(SIZE),      naturalsIterator().take(SIZE-1) ), is(1));
+        assertThat(compareLoopily( naturalsIterator().take(SIZE-1),    naturalsIterator().take(SIZE) ),   is(-1));
+    }
+
+    /*
+     Looping (not stack-consuming) comparison of two vavr "sequences" (Traversables)
+
+     Compare this method to the looping Ruby one:
+
+       https://github.com/Bill/enumerator-comparable/blob/master/lib/enumerator_comparable/initializers/enumerator_comparable.rb#L14
+
+     See how we use 2 here as the sentinel value to continue iterating whereas in the Ruby
+     code we used nil.
+
+     See how the Option monad takes the place of the Ruby array returned by try_iter(&block)
+     */
+    public static final int CONTINUE_SENTINEL = 2; // int that is none of: 1, 0, -1
+    public <T extends Comparable<T>> int compareLoopily(final Traversable<T> at, final Traversable<T> bt) {
+        while(true) {
+            final Option<T> ao = at.headOption();
+            final Option<T> bo = bt.headOption();
+
+            final int compare = ao.map(a ->
+                    bo.map(b -> {
+                        final int comparison = a.compareTo(b);
+                        // Not we use Option.some(): null means we have more work to do...
+                        return comparison == 0 ? CONTINUE_SENTINEL : comparison;
+                    }).getOrElse(1) // at is longer
+            ).getOrElse(() -> bo.map(b -> -1) // bt is longer
+                    .getOrElse(0));// at, bt are equal
+
+            if (compare == CONTINUE_SENTINEL)
+                continue;
+            return compare;
+        }
     }
 
 }
