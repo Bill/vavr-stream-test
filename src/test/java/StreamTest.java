@@ -11,7 +11,7 @@ import static org.junit.Assert.assertThat;
 
 public class StreamTest {
 
-    private static final int SIZE = (int)1E8;
+    private static final int SIZE = (int)1E7;
 
     @Test
     public void simplestIteratorScalingTest() {
@@ -23,7 +23,7 @@ public class StreamTest {
         assertThat(process(roundTripToStringAndBack(evenNaturalsIterator()), SIZE), is(2 * (SIZE +1)));
     }
 
-    @Ignore // because vavr Iterator is NOT immutable
+    // vavr Iterator is NOT immutable
     @Test
     public void iteratorImmutabilityTest() {
         final Iterator<Integer> sixPlus = naturalsIterator().drop(5);
